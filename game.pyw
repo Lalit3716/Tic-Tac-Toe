@@ -1,5 +1,6 @@
 import pygame
 import numpy as np
+from PIL import Image
 from random import choice
 from utils import Button
 from _global import Global
@@ -11,7 +12,6 @@ SCREEN_H = 600
 screen = pygame.display.set_mode((SCREEN_W, SCREEN_H))
 pygame.display.set_caption("Tic Tac Toe")
 clock = pygame.time.Clock()
-
 
 class Controller:
 	def __init__(self):
@@ -62,7 +62,6 @@ class Controller:
 
 		elif state == "playing":
 			self.game.run()
-
 
 class Game:
 	def __init__(self):
@@ -367,7 +366,7 @@ class Game:
 
 		elif text == "loose":
 			if self.mode == "AI":
-				loose_text = self.font_obj.render("AI Won", True, (0, 0, 255))
+				loose_text = self.font_obj.render("AI Won", True, (255, 0, 0))
 			else:
 				loose_text = self.font_obj.render(
 					"Player-2 Won", True, (255, 0, 0))
@@ -438,17 +437,44 @@ class Game:
 		self.restart_btn.active(self.on_restart_btn_clk)
 		self.main_menu_btn.active(self.on_select_mode_btn_clk)
 
+# Whole Game in This Tiny Statement
 controller = Controller()
 
+# Nevermind This
+make_gif = False
+frames = 240
+images = []
+
 while True:
+	# Event Loop
 	for event in pygame.event.get():
 		if event.type == pygame.QUIT:
 			pygame.quit()
 			exit()
+
 		if event.type == pygame.MOUSEBUTTONDOWN and Global.state == "playing":
 			controller.game.handle_input(event)
 
+		if event.type == pygame.KEYDOWN:
+			if event.key == pygame.K_g:
+				make_gif = True
+
+
+	# Run The Game In MainLoop
 	controller.run()
+
+	# Just Ignore
+	if make_gif:
+		strFormat = "RGBA"
+		buffer = pygame.image.tostring(screen, strFormat, False)
+		image = Image.frombytes(strFormat, screen.get_size(), buffer)
+		images.append(image)
+		frames -= 1
+		if frames <= 0:
+			images[0].save("demo.gif", save_all=True, append_images=images[1:], optimize=True, duration=1000/45, loop=0)
+			print("gif_saved!")
+			images = []
+			make_gif = False
 
 	clock.tick(60)
 	pygame.display.update()

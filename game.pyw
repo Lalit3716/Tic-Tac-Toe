@@ -3,12 +3,12 @@ import numpy as np
 from PIL import Image
 from random import choice
 from utils import Button
-from _global import Global
 
 pygame.init()
 
 SCREEN_W = 800
 SCREEN_H = 600
+STATE = "main_menu"
 screen = pygame.display.set_mode((SCREEN_W, SCREEN_H))
 pygame.display.set_caption("Tic Tac Toe")
 clock = pygame.time.Clock()
@@ -39,15 +39,17 @@ class Controller:
 											**self.btn_config, "text": "Two Player Mode", "size": (200, 60)})
 
 	def on_choose_ai_clk(self):
+		global STATE
 		self.game.set_mode("AI")
-		Global.state = "playing"
+		STATE = "playing"
 
 	def on_choose_two_player_clk(self):
+		global STATE
 		self.game.set_mode("Two Player")
-		Global.state = "playing"
+		STATE = "playing"
 
 	def run(self):
-		state = Global.state
+		global STATE
 
 		# Background
 		screen.fill("grey")
@@ -56,11 +58,11 @@ class Controller:
 		screen.blit(self.title, self.title_rect)
 
 		# Game
-		if state == "main_menu":
+		if STATE == "main_menu":
 			self.choose_ai_btn.active(self.on_choose_ai_clk)
 			self.choose_two_player_btn.active(self.on_choose_two_player_clk)
 
-		elif state == "playing":
+		elif STATE == "playing":
 			self.game.run()
 
 class Game:
@@ -114,8 +116,9 @@ class Game:
 		self.__init__()
 
 	def on_select_mode_btn_clk(self):
+		global STATE
 		self.__init__()
-		Global.state = "main_menu"
+		STATE = "main_menu"
 
 	def draw_grid(self):
 		grid_w, grid_h = self.grid_rect.size
@@ -452,7 +455,7 @@ while True:
 			pygame.quit()
 			exit()
 
-		if event.type == pygame.MOUSEBUTTONDOWN and Global.state == "playing":
+		if event.type == pygame.MOUSEBUTTONDOWN and STATE == "playing":
 			controller.game.handle_input(event)
 
 		if event.type == pygame.KEYDOWN:

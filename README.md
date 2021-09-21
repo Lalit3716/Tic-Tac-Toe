@@ -12,7 +12,7 @@
   <li><b>Game has multiple states like Starting Screen and then actual game.</b></li>
   <li>Smart AI, it will try its best to defeat you at the same time trying to win.</li>
   <li><b>Clean code using classes/oop</b>.</li>
-  <li><b>Used Numpy Library to make AI to have slightly more performance</b></li>
+  <li><b>Used Numpy arrays to make AI to have slightly more performance</b></li>
 </ol>
 
 ### Note:-

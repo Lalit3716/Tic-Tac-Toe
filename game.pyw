@@ -6,6 +6,7 @@ from utils import Button
 
 pygame.init()
 
+# Global Variables
 SCREEN_W = 800
 SCREEN_H = 600
 STATE = "main_menu"
@@ -13,6 +14,8 @@ screen = pygame.display.set_mode((SCREEN_W, SCREEN_H))
 pygame.display.set_caption("Tic Tac Toe")
 clock = pygame.time.Clock()
 
+
+# Controller Class TO Control The states of game
 class Controller:
 	def __init__(self):
 		# Game
@@ -65,6 +68,8 @@ class Controller:
 		elif STATE == "playing":
 			self.game.run()
 
+
+# Main Game Class
 class Game:
 	def __init__(self):
 
@@ -438,6 +443,7 @@ class Game:
 		# Buttons
 		self.restart_btn.active(self.on_restart_btn_clk)
 		self.main_menu_btn.active(self.on_select_mode_btn_clk)
+
 
 # Whole Game in This Tiny Statement
 controller = Controller()

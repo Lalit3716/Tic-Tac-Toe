@@ -132,16 +132,10 @@ class Game:
 						 (0, 2 * h), (grid_w, 2 * h), 2)
 		screen.blit(self.grid_surface, self.grid_rect)
 
-	def ai_move(self, player_move):
-		choosed_box = self.ai_choice(player_move)
-		choosed_box[1] = self.opponent  # To be extra safe
-		self.player_turn = True
-		self.opponent_turn = False
-
-	def ai_choice(self, player_box):
+	def ai_choice(self):
 		# First Move after Player
 		if self.move_number == 1:
-			position = player_box[2]
+			position = self.player_box[2]
 			if position == "center":
 				x, y = choice([(0, 0), (0, 2), (2, 0), (2, 2)])
 
@@ -177,7 +171,10 @@ class Game:
 					else:
 						x, y = choice(corners)
 
-		return self.boxes[x, y]
+		choosed_box = self.boxes[x, y]
+		choosed_box[1] = self.opponent  # To be extra safe
+		self.player_turn = True
+		self.opponent_turn = False
 
 	def ai_logic(self, player):
 		# Checks Diagonal For 2 X's or O's
@@ -227,10 +224,10 @@ class Game:
 	def handle_input(self, event):
 		if event.button == 1 and not (self.won or self.loose or self.draw):
 			for ix, iy in np.ndindex(self.boxes.shape):
-				self.box = self.boxes[ix, iy]
-				if self.box[1] == "" and self.box[0].collidepoint(event.pos):
+				self.player_box = self.boxes[ix, iy]
+				if self.player_box[1] == "" and self.player_box[0].collidepoint(event.pos):
 					if self.player_turn and not self.draw:
-						self.box[1] = self.player
+						self.player_box[1] = self.player
 						self.move_number += 1
 						self.player_turn = False
 						self.opponent_turn = True
@@ -242,12 +239,13 @@ class Game:
 								self.ai_timer = True
 
 					elif self.opponent_turn and not self.mode == "AI" and not (self.draw or self.won or self.loose):
-						self.box[1] = self.opponent
+						self.player_box[1] = self.opponent
 						self.move_number += 1
 						self.player_turn = True
 						self.opponent_turn = False
 						self.check_draw()
 						self.check_win()
+					
 					break
 
 	def draw_crosses_and_circles(self):
@@ -409,6 +407,7 @@ class Game:
 			screen.blit(turn, (SCREEN_W - 200, SCREEN_H - 550))
 
 	def run(self):
+		
 		# Graphics
 		self.draw_grid()
 		self.draw_crosses_and_circles()
@@ -420,7 +419,7 @@ class Game:
 				self.ai_timeout -= 1
 
 			if self.ai_timeout <= 0:
-				self.ai_move(self.box)
+				self.ai_choice()
 				self.check_draw()
 				self.check_win()
 				self.ai_timer = False

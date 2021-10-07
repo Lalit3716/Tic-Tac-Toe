@@ -1,10 +1,15 @@
 import pygame
+import socket
+import threading
 import numpy as np
-from PIL import Image
-from random import choice
-from utils import Button
+import pickle
+from string import ascii_letters
+from random import choice, sample
+from utils import Button, Input
 
+# Initialize Pygame
 pygame.init()
+
 
 # Global Variables
 SCREEN_W = 800
@@ -15,11 +20,16 @@ pygame.display.set_caption("Tic Tac Toe")
 clock = pygame.time.Clock()
 
 
+# Server
+server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+IP = socket.gethostbyname("localhost")
+PORT = 5556
+
 # Controller Class TO Control The states of game
 class Controller:
 	def __init__(self):
 		# Game
-		self.game = Game()
+		self.game = Game(self.error_contoller)
 
 		# Title
 		self.title = self.game.font_obj.render("Tic Tac Toe", True, "#86340A")
@@ -37,10 +47,70 @@ class Controller:
 			"hover": "#FF5C58"
 		}
 		self.choose_ai_btn = Button(
-			screen, (SCREEN_W // 2 - 100, SCREEN_H // 2), self.btn_config)
-		self.choose_two_player_btn = Button(screen, (SCREEN_W // 2 + 100, SCREEN_H // 2), {
-											**self.btn_config, "text": "Two Player Mode", "size": (200, 60)})
+			screen, (SCREEN_W // 2 - 100, SCREEN_H // 2 - 50), self.btn_config)
 
+		self.choose_two_player_btn = Button(screen,
+											(SCREEN_W // 2 + 100,
+											 SCREEN_H // 2 - 50),
+											{**self.btn_config,
+											 "text": "Two Player Mode",
+											 "size": (200,
+													  60)})
+
+		self.choose_multiplayer_btn = Button(
+			screen,
+			(SCREEN_W // 2,
+			 SCREEN_H // 2 + 50),
+			{
+				**self.btn_config,
+				"text": "Multiplayer",
+				"size": (
+					200,
+					60)})
+
+		# Input Fields
+		self.name_field_font = self.game.font_obj.render(
+			"Name", True, "#000000")
+		self.name_field_pos = self.name_field_font.get_rect(center=(250, 250))
+		self.name_field = Input(150, 300, size=(200, 25))
+
+		self.room_field_font = self.game.font_obj.render(
+			"Room ID", True, "#000000")
+		self.room_field_pos = self.room_field_font.get_rect(center=(550, 250))
+		self.room_field = Input(450, 300, size=(200, 25))
+
+		self.all_inputs = [self.name_field, self.room_field]
+
+		self.join_btn = Button(screen,
+							   (SCREEN_W // 2 - 70,
+								SCREEN_H // 2 + 150),
+							   {**self.btn_config,
+								"text": "Join",
+								"size": (100,
+										 40)})
+		self.create_btn = Button(screen,
+								 (SCREEN_W // 2 + 70,
+								  SCREEN_H // 2 + 150),
+								 {**self.btn_config,
+								  "text": "Create",
+								  "size": (100,
+										   40)})
+
+		self.info_font = pygame.font.Font(None, 16)
+		self.error_font = pygame.font.Font(None, 32)
+		self.err_msg = ""
+
+		self.info1_font = self.info_font.render(
+			"Leave Blank For Creating Room", True, "#000000")
+		
+		self.info2_font = self.info_font.render(
+			"Name Field Must Not Be Empty", True, "#000000")
+
+		self.error_surf = self.error_font.render(self.err_msg, True, "#FF0000")
+
+	def error_contoller(self, msg=""):
+		self.err_msg = msg
+		
 	def on_choose_ai_clk(self):
 		global STATE
 		self.game.set_mode("AI")
@@ -50,6 +120,43 @@ class Controller:
 		global STATE
 		self.game.set_mode("Two Player")
 		STATE = "playing"
+
+	def on_choose_multiplayer_clk(self):
+		global STATE
+		STATE = "room"
+
+	def on_join_btn_clk(self):
+		if self.name_field.input.strip() != "" and self.room_field.input.strip() != "" and len(self.room_field.input.strip()) == 6:
+			try:
+				server.connect((IP, PORT))
+				client = pickle.dumps(
+					{"name": self.name_field.input, "room_id": self.room_field.input, "req": "join"})
+				self.game.set_mode("Multiplayer")
+				server.send(client)
+
+			except:
+				self.err_msg = "Server Down Sorry!"
+
+		else:
+			if self.name_field.input.strip() == "":
+				self.err_msg = "Name Empty"
+			elif self.room_field.input.strip() == "":
+				self.err_msg = "Room ID Empty"
+			elif len(self.room_field.input) != 6:
+				self.err_msg = "Room ID Must Be Six Letters Long"
+
+	def on_create_btn_clk(self):
+		if self.name_field.input.strip() != "":
+			try:
+				server.connect((IP, PORT))
+				room_id = "".join(sample(ascii_letters, 6))
+				client = pickle.dumps(
+					{"name": self.name_field.input, "room_id": room_id, "req": "create"})
+				self.game.set_mode("Multiplayer")
+				server.send(client)
+
+			except:
+				self.err_msg = "Server Down, Sorry!"
 
 	def run(self):
 		global STATE
@@ -64,6 +171,24 @@ class Controller:
 		if STATE == "main_menu":
 			self.choose_ai_btn.active(self.on_choose_ai_clk)
 			self.choose_two_player_btn.active(self.on_choose_two_player_clk)
+			self.choose_multiplayer_btn.active(self.on_choose_multiplayer_clk)
+
+		elif STATE == "room":
+			screen.blit(self.name_field_font, self.name_field_pos)
+			self.name_field.active()
+			screen.blit(self.info2_font, (150, 330))
+
+			screen.blit(self.room_field_font, self.room_field_pos)
+			self.room_field.active()
+			screen.blit(self.info1_font, (450, 330))
+
+			self.join_btn.active(self.on_join_btn_clk)
+			self.create_btn.active(self.on_create_btn_clk)
+
+			# Show Errors
+			self.error_surf = self.error_font.render(self.err_msg, True, "#FF0000")
+			self.err_rect = self.error_surf.get_rect(center=(SCREEN_W//2, 150))
+			screen.blit(self.error_surf, self.err_rect)
 
 		elif STATE == "playing":
 			self.game.run()
@@ -71,9 +196,10 @@ class Controller:
 
 # Main Game Class
 class Game:
-	def __init__(self):
+	def __init__(self, error_contoller=None):
 
 		# General Setup
+		self.mode = None
 		self.grid_surface = pygame.Surface((300, 300), pygame.SRCALPHA)
 		self.grid_rect = self.grid_surface.get_rect(
 			center=(SCREEN_W // 2, SCREEN_H // 2))
@@ -81,6 +207,7 @@ class Game:
 		self.create_boxes()
 		self.player_turn = True
 		self.opponent_turn = False
+		self.opponent_left = False
 		self.move_number = 0
 		self.won = False
 		self.winner_boxes = None
@@ -89,6 +216,9 @@ class Game:
 		self.draw = False
 		self.player = "X"
 		self.opponent = "O"
+		self.p1 = "X"
+		self.p2 = "O"
+		self.room_id = "None"
 		self.ai_timer = False
 		self.ai_timeout = 30
 
@@ -109,20 +239,44 @@ class Game:
 		}
 		self.restart_btn = Button(
 			screen, self.restart_btn_pos, self.restart_btn_config)
+		
 		self.main_menu_config = {**self.restart_btn_config,
 								 "text": "Select Mode", "size": (150, 40)}
 		self.main_menu_btn = Button(
 			screen, (SCREEN_W // 2 + 80, SCREEN_H - 80), self.main_menu_config)
 
+		# Multiplayer Error Controller
+		self.error_contoller = error_contoller
+
 	def set_mode(self, mode):
 		self.mode = mode
+		if self.mode == "Multiplayer":
+			self.opponent_left = False
+			self.thread = threading.Thread(target=self.recv_server)
+			self.thread.start()
 
 	def on_restart_btn_clk(self):
-		self.__init__()
+		if self.mode == "Multiplayer":
+			self.send_server("Restart Button Clicked")
+		
+		else:
+			err_contol = self.error_contoller
+			mode = self.mode
+			self.__init__()
+			self.mode = mode # Preserve Last Mode
+			self.error_contoller = err_contol # Preserve Error Control Method
 
 	def on_select_mode_btn_clk(self):
-		global STATE
+		global STATE, server
+	
+		if self.mode == "Multiplayer":
+			self.send_server("Select Button Clicked")
+			server.close()
+			server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+		err_contol = self.error_contoller
 		self.__init__()
+		self.error_contoller = err_contol # Preserve Error Control
 		STATE = "main_menu"
 
 	def draw_grid(self):
@@ -138,6 +292,7 @@ class Game:
 		screen.blit(self.grid_surface, self.grid_rect)
 
 	def ai_choice(self):
+		
 		# First Move after Player
 		if self.move_number == 1:
 			position = self.player_box[2]
@@ -153,12 +308,13 @@ class Game:
 		else:
 			changed = False
 			res = self.ai_logic(self.player)		# Defeats Player
-			if res != None:
+			if res is not None:
 				x, y = res
 				changed = True
 
-			res = self.ai_logic(self.opponent)		# Favours itself over Defeating Player
-			if res != None:
+			# Favours itself over Defeating Player
+			res = self.ai_logic(self.opponent)
+			if res is not None:
 				x, y = res
 				changed = True
 
@@ -226,11 +382,12 @@ class Game:
 					self.boxes[x1, y1][1] == self.opponent
 					return x1, y1
 
-	def handle_input(self, event):
+	def handle_normal_input(self, event):
 		if event.button == 1 and not (self.won or self.loose or self.draw):
 			for ix, iy in np.ndindex(self.boxes.shape):
 				self.player_box = self.boxes[ix, iy]
-				if self.player_box[1] == "" and self.player_box[0].collidepoint(event.pos):
+				if self.player_box[1] == "" and self.player_box[0].collidepoint(
+						event.pos):
 					if self.player_turn and not self.draw:
 						self.player_box[1] = self.player
 						self.move_number += 1
@@ -250,8 +407,90 @@ class Game:
 						self.opponent_turn = False
 						self.check_draw()
 						self.check_win()
-					
+
 					break
+
+	def handle_multiplayer_input(self, event):
+		if event.button == 1 and not (
+				self.won or self.loose or self.draw) and self.player_turn:
+			for ix, iy in np.ndindex(self.boxes.shape):
+				self.player_box = self.boxes[ix, iy]
+				if self.player_box[1] == "" and self.player_box[0].collidepoint(
+						event.pos):
+					self.player_box[1] = self.player
+					self.player_turn = False
+					self.opponent_turn = True
+					self.check_draw()
+					self.check_win()
+					self.send_server({"ix": ix, "iy": iy})
+					break
+
+	def recv_server(self):
+		global server, STATE
+		while True:
+			try:
+				response = server.recv(5000)
+				if response:
+					response = pickle.loads(response)
+					event = response["event"]
+					
+					if event == "room_created":
+						self.p1 = response["name"]
+						self.p2 = "Waiting"
+						self.room_id = response["room_id"]
+						self.player_turn = False
+						self.opponent_turn = True
+						STATE = "playing"
+						self.error_contoller()
+
+					elif event == "p2_joined":
+						STATE = "playing"
+						self.p1 = response["p1"]
+						self.p2 = response["p2"]
+						self.room_id = response["room_id"]
+						self.create_boxes()
+						self.draw = False
+						self.won = False
+						self.loose = False
+						self.oppponent_left = False
+						self.player_turn = response["player_turn"]
+						self.opponent_turn = not self.player_turn
+						self.error_contoller()
+
+					elif event == "player_move":
+						x = response["ix"]
+						y = response["iy"]
+						self.boxes[x, y][1] = self.opponent
+						self.player_turn = True
+						self.opponent_turn = False
+						self.check_win()
+						self.check_draw()
+
+					elif event == "restart":
+						self.create_boxes()
+						self.won = False
+						self.loose = False
+						self.draw = False
+						self.player_turn = response["player_turn"]
+						self.opponent_turn = not self.player_turn
+
+					elif event == "Opponent Left":
+						self.p2 = f"{self.p2} Left"
+						self.player_turn = False
+						self.opponent_turn = True
+						self.opponent_left = True
+
+					elif event == "error":
+						self.error_contoller(response["message"])
+						server.close()
+						server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+			except:
+				break
+
+	def send_server(self, obj):
+		obj = pickle.dumps(obj)
+		server.send(obj)
 
 	def draw_crosses_and_circles(self):
 		for ix, iy in np.ndindex(self.boxes.shape):
@@ -287,35 +526,33 @@ class Game:
 					item.append("edge")
 				self.boxes[row_index, col_index] = item
 
-	def debug(self):
-		for ix, iy in np.ndindex(self.boxes.shape):
-			pygame.draw.rect(screen, "#00A19D", self.boxes[ix, iy][0], 2)
-
 	def check_win(self):
 		# Rows and Coloumns
 		for i in range(3):
-			if all(map(lambda x: x[1] == self.player, row := self.boxes[i, :])):
+			if all(map(lambda x: x[1] == self.player,
+				   row := self.boxes[i, :])):
 				self.won = True
-				self.winner_boxes = row 
+				self.winner_boxes = row
 				self.win_type = "row"
 
 			elif all(map(lambda x: x[1] == self.opponent, row := self.boxes[i, :])):
 				self.loose = True
-				self.winner_boxes = row 
+				self.winner_boxes = row
 				self.win_type = "row"
 
 			elif all(map(lambda x: x[1] == self.player, col := self.boxes[:, i])):
 				self.won = True
-				self.winner_boxes = col 
+				self.winner_boxes = col
 				self.win_type = "col"
 
 			elif all(map(lambda x: x[1] == self.opponent, col := self.boxes[:, i])):
 				self.loose = True
-				self.winner_boxes = col 
+				self.winner_boxes = col
 				self.win_type = "col"
 
 		# Checking Diagonals
-		if all(map(lambda x: x[1] == self.player, main_diag := np.diag(self.boxes))):
+		if all(map(lambda x: x[1] == self.player,
+			   main_diag := np.diag(self.boxes))):
 			self.won = True
 			self.winner_boxes = main_diag
 			self.win_type = "main_diag"
@@ -351,31 +588,55 @@ class Game:
 		color = "#170055"
 		for box in boxes:
 			if type == "row":
-				pygame.draw.line(screen, color, box[0].midleft, box[0].midright, 2)
+				pygame.draw.line(
+					screen, color, box[0].midleft, box[0].midright, 2)
 			elif type == "col":
-				pygame.draw.line(screen, color, box[0].midtop, box[0].midbottom, 2)
+				pygame.draw.line(
+					screen, color, box[0].midtop, box[0].midbottom, 2)
 			elif type == "main_diag":
-				pygame.draw.line(screen, color, box[0].topleft, box[0].bottomright, 2)
+				pygame.draw.line(
+					screen,
+					color,
+					box[0].topleft,
+					box[0].bottomright,
+					2)
 			elif type == "diag":
-				pygame.draw.line(screen, color, box[0].topright, box[0].bottomleft, 2)
+				pygame.draw.line(
+					screen,
+					color,
+					box[0].topright,
+					box[0].bottomleft,
+					2)
 
 	def display_text(self, text):
 		if text == "won":
 			if self.mode == "AI":
 				won_text = self.font_obj.render(
 					"Player Won", True, (0, 0, 255))
+
+			elif self.mode == "Multiplayer":
+				won_text = self.font_obj.render(
+					f"{self.p1} Won", True, (0, 0, 255))
+
 			else:
 				won_text = self.font_obj.render(
 					"Player-1 Won", True, (0, 0, 255))
+
 			won_text_rect = won_text.get_rect(center=(SCREEN_W // 2, 100))
 			screen.blit(won_text, won_text_rect)
 
 		elif text == "loose":
 			if self.mode == "AI":
 				loose_text = self.font_obj.render("AI Won", True, (255, 0, 0))
+
+			elif self.mode == "Multiplayer":
+				loose_text = self.font_obj.render(
+					f"{self.p2} Won", True, (255, 0, 0))
+
 			else:
 				loose_text = self.font_obj.render(
 					"Player-2 Won", True, (255, 0, 0))
+
 			loose_text_rect = loose_text.get_rect(center=(SCREEN_W // 2, 100))
 			screen.blit(loose_text, loose_text_rect)
 
@@ -391,6 +652,16 @@ class Game:
 				self.player + " - Player", True, (0, 0, 255))
 			opponent = font_obj.render(
 				self.opponent + " - AI", True, (255, 0, 0))
+
+		elif self.mode == "Multiplayer":
+			player = font_obj.render(
+				f"{self.p1} - {self.player}", True, (0, 0, 255))
+			opponent = font_obj.render(
+				f"{self.p2} - {self.opponent}", True, (255, 0, 0))
+			room_id = font_obj.render(
+				f"Room - {self.room_id}", True, "#000000")
+			screen.blit(room_id, (50, 150))
+
 		else:
 			player = font_obj.render(
 				self.player + " - Player 1", True, (0, 0, 255))
@@ -398,9 +669,11 @@ class Game:
 				self.opponent + " - Player 2", True, (255, 0, 0))
 
 		font_obj = pygame.font.Font(None, 35)
+
 		if self.player_turn:
 			turn = font_obj.render(
 				"Waiting for - " + self.player, True, (0, 0, 255))
+
 		elif self.opponent_turn:
 			turn = font_obj.render(
 				"Waiting for - " + self.opponent, True, (255, 0, 0))
@@ -409,10 +682,10 @@ class Game:
 		screen.blit(opponent, (50, 85))
 
 		if not (self.draw or self.won or self.loose):
-			screen.blit(turn, (SCREEN_W - 200, SCREEN_H - 550))
+			if not self.mode == "Multiplayer" or (self.mode == "Multiplayer" and self.p2 != "Waiting"):
+				screen.blit(turn, (SCREEN_W - 260, SCREEN_H - 565))
 
 	def run(self):
-		
 		# Graphics
 		self.draw_grid()
 		self.draw_crosses_and_circles()
@@ -441,48 +714,45 @@ class Game:
 			self.display_text("draw")
 
 		# Buttons
-		self.restart_btn.active(self.on_restart_btn_clk)
+		if self.mode == "Multiplayer":
+			if not self.opponent_left and (self.won or self.draw or self.loose):
+				self.restart_btn.active(self.on_restart_btn_clk)
+		else:
+			self.restart_btn.active(self.on_restart_btn_clk)
+
 		self.main_menu_btn.active(self.on_select_mode_btn_clk)
 
 
-# Whole Game in This Tiny Statement
+# Contoller Instance
 controller = Controller()
 
-# Nevermind This
-make_gif = False
-frames = 240
-images = []
 
 while True:
 	# Event Loop
 	for event in pygame.event.get():
 		if event.type == pygame.QUIT:
+		
+			if controller.game.mode == "Multiplayer" and STATE == "playing":
+				controller.game.send_server("Select Button Clicked")
+				server.close()
+
 			pygame.quit()
 			exit()
 
 		if event.type == pygame.MOUSEBUTTONDOWN and STATE == "playing":
-			controller.game.handle_input(event)
+			if controller.game.mode == "Multiplayer":
+				controller.game.handle_multiplayer_input(event)
+			else:
+				controller.game.handle_normal_input(event)
 
 		if event.type == pygame.KEYDOWN:
-			if event.key == pygame.K_g:
-				make_gif = True
+			if STATE == "room":
+				for _input in controller.all_inputs:
+					_input.take_input(event)
 
 
 	# Run The Game In MainLoop
 	controller.run()
-
-	# Just Ignore
-	if make_gif:
-		strFormat = "RGBA"
-		buffer = pygame.image.tostring(screen, strFormat, False)
-		image = Image.frombytes(strFormat, screen.get_size(), buffer)
-		images.append(image)
-		frames -= 1
-		if frames <= 0:
-			images[0].save("demo.gif", save_all=True, append_images=images[1:], optimize=True, duration=1000/45, loop=0)
-			print("gif_saved!")
-			images = []
-			make_gif = False
 
 	clock.tick(60)
 	pygame.display.update()

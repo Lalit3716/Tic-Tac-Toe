@@ -158,6 +158,10 @@ class Controller:
 			except:
 				self.err_msg = "Server Down, Sorry!"
 
+		else:
+			self.err_msg = "Name Field Empty"
+			
+
 	def run(self):
 		global STATE
 

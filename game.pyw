@@ -135,7 +135,7 @@ class Controller:
 				server.send(client)
 
 			except:
-				self.err_msg = "Server Down Sorry!"
+				self.err_msg = "Server Down, run server.py to fix!"
 
 		else:
 			if self.name_field.input.strip() == "":
@@ -156,7 +156,7 @@ class Controller:
 				server.send(client)
 
 			except:
-				self.err_msg = "Server Down, Sorry!"
+				self.err_msg = "Server Down, run server.py to fix!"
 
 		else:
 			self.err_msg = "Name Field Empty"
